@@ -12,7 +12,8 @@ import requests
 from bs4 import BeautifulSoup
 
 # ================= CONFIG =================
-TOKEN = "MTQ1MTUxOTIxODIxMzE5MTY5MA.Gjh7Jb.4fvLgE6JcFM40zEORTmVhUeovaTqIBE17avPa8"
+# Token: đặt biến môi trường DISCORD_BOT_TOKEN hoặc sửa dòng dưới. Nếu bị 401 Unauthorized thì token hết hạn/reset — vào Discord Developer Portal → Application → Bot → Reset Token, copy token mới.
+TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "TOKEN")
 CHANNEL_SCAN_ID = 1444536423435735060   # Channel chứa link snote
 CHANNEL_OUTPUT_ID = 1470017876986433556   # Channel nhận toàn bộ phản hồi / kết quả
 CHANNEL_CHECK_RESULT_ID = 1451529761569636464  # Channel nhận kết quả /check (embed)
@@ -207,6 +208,10 @@ async def run_check(out_channel):
                 try:
                     async with session.get(url, timeout=aiohttp.ClientTimeout(total=TIMEOUT)) as r:
                         if r.status == 400 or r.status == 429:
+                            try:
+                                await r.read()
+                            except Exception:
+                                pass
                             retries += 1
                             if retries <= CHECK_RETRY_MAX:
                                 m = await out_channel.send(
@@ -239,7 +244,7 @@ async def run_check(out_channel):
                         emb = discord.Embed(title=title, description=desc, color=0x5865F2)
                         await check_channel.send(embed=emb)
 
-                except asyncio.TimeoutError as e:
+                except asyncio.TimeoutError:
                     emb = discord.Embed(title=f"❌ Link số {idx}/{total}", description=f"{url}\nLỗi: Timeout", color=0xED4245)
                     await check_channel.send(embed=emb)
                     success = True
@@ -331,4 +336,14 @@ async def on_ready():
 
 
 if __name__ == "__main__":
-    client.run(TOKEN)
+    if not (TOKEN and TOKEN.strip()):
+        print("Chưa có token. Đặt biến môi trường DISCORD_BOT_TOKEN hoặc sửa TOKEN trong discord_bot.py")
+        print("Lấy token: https://discord.com/developers/applications → chọn app → Bot → Reset Token → Copy")
+        raise SystemExit(1)
+    try:
+        client.run(TOKEN)
+    except discord.LoginFailure:
+        print("Token không hợp lệ (401 Unauthorized). Token có thể đã bị reset hoặc hết hạn.")
+        print("Vào https://discord.com/developers/applications → Application của bạn → Bot → Reset Token")
+        print("Copy token mới và: đặt DISCORD_BOT_TOKEN trong môi trường, hoặc dán vào TOKEN trong discord_bot.py")
+        raise SystemExit(1)
